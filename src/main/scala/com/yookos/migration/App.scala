@@ -44,7 +44,7 @@ object App extends App {
 
   val system = SparkEnv.get.actorSystem
   
-  if (mode != "local") {
+  if (mode == "yarn") {
     sc.addJar("hdfs:///user/hadoop-user/data/jars/postgresql-9.4-1200-jdbc41.jar")
     sc.addJar("hdfs:///user/hadoop-user/data/jars/migration-contactsprofile-0.1-SNAPSHOT.jar")
   }
