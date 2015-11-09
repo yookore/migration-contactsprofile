@@ -98,7 +98,7 @@ object App extends App {
             case 6 =>
               println(f"==fieldid:$fieldid%d and value:$value==")
               val mobilenumber = 
-                if (value != Some(null)) 
+                if (value != null) 
                   Some(value.split("\\|")(0)) else Some(value)
               /*sc.parallelize(Seq(Contacts(
                 Some(null), Some(profileRow.getString(1)), row.getString(2),
@@ -116,7 +116,7 @@ object App extends App {
             case 4 => 
               println(f"==fieldid:$fieldid%d and value:$value==")
               val phonenumber = 
-                if (value != Some(null)) 
+                if (value != null) 
                   Some(value.split("\\|")(0)) else Some(value)
               save(Seq(Contacts(
                 Some(null), Some(null), username,
@@ -127,7 +127,7 @@ object App extends App {
             case 5 => 
               println(f"==fieldid:$fieldid%d and value:$value==")
               val homephonenumber = 
-                if (value != Some(null)) 
+                if (value != null) 
                   Some(value.split("\\|")(0)) else Some(value)
               save(Seq(Contacts(
                 homephonenumber, Some(null), username,
