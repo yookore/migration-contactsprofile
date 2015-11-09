@@ -1,0 +1,13 @@
+---
+applications:
+- name: migration-contacts
+  instances: 1
+  memory: 8G
+  path: target/migration-contactsprofiles-0.1-SNAPSHOT.jar
+  #buildpack: https://github.com/cloudfoundry/java-buildpack.git
+  #buildpack: java_buildpack_offline_spark_optimized_v33
+  buildpack: java_buildpack_offline
+  timeout: 180
+  services:
+    - redis
+    - cassandra
