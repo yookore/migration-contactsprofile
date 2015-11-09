@@ -143,7 +143,7 @@ object App extends App {
           }
       }
     
-    println("===Latest ContactsProfile cachedIndex=== " + cache.get("latest_legacy_files_index").toInt)
+    println("===Latest ContactsProfile cachedIndex=== " + cache.get("latest_legacy_contacts_index").toInt)
   }
 
   def save(contact: Seq[Contacts]) = contact match {
