@@ -60,10 +60,13 @@ object Config {
       conf.set("spark.logConf", "true")
       conf.set("spark.akka.logLifecycleEvents", "true")
       conf.set("spark.driver.allowMultipleContexts", "true")
-      conf.set("spark.cassandra.connection.host", "localhost")
+      //conf.set("spark.cassandra.connection.host", "localhost")
       //conf.set("spark.cassandra.connection.host", "192.168.10.200")
       //conf.set("spark.cassandra.auth.username", "cassandra")
       //conf.set("spark.cassandra.auth.password", "cassandra")
+      conf.set("spark.cassandra.connection.host", "192.168.121.174")
+      conf.set("spark.cassandra.auth.username", "cassandra")
+      conf.set("spark.cassandra.auth.password", "Gonzo@7072")
 
     case "sandbox" => 
       val driverPort = 7077
@@ -236,8 +239,10 @@ object Config {
     case "local" =>
       val param = name.getOrElse("")
       param match {
-        case "keyspace" => s"yookore"
-        case "replStrategy" => "{'class': 'SimpleStrategy', 'replication_factor': 3}"
+        //case "keyspace" => s"yookore"
+        //case "replStrategy" => "{'class': 'SimpleStrategy', 'replication_factor': 3}"
+        case "keyspace" => s"yookos_migration"
+        case "replStrategy" => "{'class': 'NetworkTopologyStrategy', 'DC1': 3}"
       }
 
     case "dev" =>

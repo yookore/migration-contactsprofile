@@ -85,7 +85,7 @@
                 </transformer>
                 <transformer>
                   <manifestEntries>
-                    <Main-Class>com.yookos.migration.App</Main-Class>
+                    <Main-Class>com.yookos.migration.ContactsProfile</Main-Class>
                   </manifestEntries>
                 </transformer>
               </transformers>

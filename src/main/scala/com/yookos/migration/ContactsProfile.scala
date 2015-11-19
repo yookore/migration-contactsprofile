@@ -28,7 +28,7 @@ import org.joda.time.DateTime
 /**
  * @author ${user.name}
  */
-object App extends App {
+object ContactsProfile extends App {
   
   // Configuration for a Spark application.
   // Used to set various Spark parameters as key-value pairs.
@@ -46,7 +46,7 @@ object App extends App {
   
   if (mode == "yarn") {
     sc.addJar("hdfs:///user/hadoop-user/data/jars/postgresql-9.4-1200-jdbc41.jar")
-    sc.addJar("hdfs:///user/hadoop-user/data/jars/migration-contactsprofile-0.1-SNAPSHOT.jar")
+    sc.addJar("hdfs:///user/hadoop-user/data/jars/migration-contactsprofiles-0.1-SNAPSHOT.jar")
   }
   
   createSchema(conf)
@@ -56,7 +56,8 @@ object App extends App {
   val keyspace = Config.cassandraConfig(mode, Some("keyspace"))
   val totalLegacyUsers = 2124155L
   var cachedIndex = if (cache.get("latest_legacy_contacts_index") == null) 0 else cache.get("latest_legacy_contacts_index").toInt
-
+  
+  val contacts = sc.cassandraTable[Contacts](s"$keyspace", "legacyusercontacts").cache()
   // Using the mappings table, get the profiles of
   // users from 192.168.10.225 and dump to mongo
   // at 10.10.10.216
@@ -70,8 +71,10 @@ object App extends App {
     "url" -> Config.dataSourceUrl(mode, Some("legacy")),
     "dbtable" -> "jiveuserprofile")
   )
-  
-  val df = mappingsDF.select(mappingsDF("userid"), mappingsDF("yookoreid"), mappingsDF("username"))
+
+  val legacyprofiles = legacyDF.select(legacyDF("fieldid"), legacyDF("value"), legacyDF("userid")).cache().collect()
+
+  val df = mappingsDF.select(mappingsDF("userid"), mappingsDF("yookoreid"), mappingsDF("username")).cache()
 
   reduce(df)
 
@@ -86,12 +89,21 @@ object App extends App {
 
 
   private def upsert(row: Row, jiveuserid: Long) = {
-    legacyDF.select(legacyDF("fieldid"), legacyDF("value"), legacyDF("userid")).filter(f"userid = $jiveuserid%d").collect().foreach {
+    //val lp = legacyprofiles.filter(f"userid = $jiveuserid%d")
+    val lp = legacyprofiles.filter(csp => csp.getLong(2) == jiveuserid)
+    if (lp.length > 0) {
+      lp.foreach {
         profileRow =>
           val fieldid = profileRow.getLong(0)
           val value = profileRow.getString(1)
           val username = row.getString(2)
           val userid = row.getString(1)
+          val contactRDD = 
+            if (contacts.count() > 0) contacts.filter(c => c.userid == userid)
+              else contacts.toEmptyCassandraRDD
+          val contact:Contacts = 
+            if (contactRDD.count() > 0) {println("==contactRDD== " + contactRDD.first); contactRDD.first 
+            }else Contacts(Some(null), Some(null), username, Some(null), Some(null), userid)
 
           fieldid match {
             // mobilenumber
@@ -100,16 +112,9 @@ object App extends App {
               val mobilenumber = 
                 if (value != null) 
                   Some(value.split("\\|")(0)) else Some(value)
-              /*sc.parallelize(Seq(Contacts(
-                Some(null), Some(profileRow.getString(1)), row.getString(2),
-                Some(null), Some(null), row.getString(1)
-              )))
-              .saveToCassandra(s"$keyspace", "legacycontacts", 
-                SomeColumns("homenumber", "mobilenumber", "username",
-                  "phonenumber", "alternateemail", "userid"))*/
-              save(Seq(Contacts(
-                Some(null), mobilenumber, username,
-                Some(null), Some(null), userid
+                save(Seq(Contacts(
+                  contact.homenumber, mobilenumber, username,
+                  contact.phonenumber, contact.alternateemail, userid
                 )))
    
             // phonenumber. same as workphonenumber
@@ -118,9 +123,9 @@ object App extends App {
               val phonenumber = 
                 if (value != null) 
                   Some(value.split("\\|")(0)) else Some(value)
-              save(Seq(Contacts(
-                Some(null), Some(null), username,
-                phonenumber, Some(null), userid
+                save(Seq(Contacts(
+                  contact.homenumber, contact.mobilenumber, username,
+                  phonenumber, contact.alternateemail, userid
               )))
 
             // homephonenumber
@@ -130,27 +135,31 @@ object App extends App {
                 if (value != null) 
                   Some(value.split("\\|")(0)) else Some(value)
               save(Seq(Contacts(
-                homephonenumber, Some(null), username,
-                Some(null), Some(null), userid)))
+                homephonenumber, contact.mobilenumber, username,
+                contact.phonenumber, contact.alternateemail, userid
+              )))
 
             // alternateemail
             case 10 => 
               save(Seq(Contacts(
-                Some(null), Some(null), username,
-                Some(null), Some(value), userid)))
+                contact.homenumber, contact.mobilenumber, username,
+                contact.phonenumber, contact.alternateemail, userid)))
 
             case _ => println("Unknown match")
           }
-      }
     
-    println("===Latest ContactsProfile cachedIndex=== " + cache.get("latest_legacy_contacts_index").toInt)
+          println("===Latest ContactsProfile cachedIndex=== " + cache.get("latest_legacy_contacts_index").toInt)
+      }
+    }
+    
   }
 
   def save(contact: Seq[Contacts]) = contact match {
     case Nil => println("Nil")
     case List(c @ _*) => 
+      println("===new contact to save=== " + contact)
       sc.parallelize(contact)
-        .saveToCassandra(s"$keyspace", "legacycontacts", 
+        .saveToCassandra(s"$keyspace", "legacyusercontacts", 
           SomeColumns("homenumber", "mobilenumber", "username",
             "phonenumber", "alternateemail", "userid")
         )
@@ -163,7 +172,7 @@ object App extends App {
     val replicationStrategy = Config.cassandraConfig(mode, Some("replStrategy"))
     CassandraConnector(conf).withSessionDo { sess =>
       sess.execute(s"CREATE KEYSPACE IF NOT EXISTS $keyspace WITH REPLICATION = $replicationStrategy")
-      sess.execute(s"CREATE TABLE IF NOT EXISTS $keyspace.legacycontacts (homenumber text, mobilenumber text, userid text, username text, phonenumber text, alternateemail text, PRIMARY KEY (userid, username)) WITH CLUSTERING ORDER BY (username DESC)")
+      sess.execute(s"CREATE TABLE IF NOT EXISTS $keyspace.legacyusercontacts (homenumber text, mobilenumber text, userid text, username text, phonenumber text, alternateemail text, PRIMARY KEY (userid, username)) WITH CLUSTERING ORDER BY (username DESC)")
     } wasApplied
   }
 }
